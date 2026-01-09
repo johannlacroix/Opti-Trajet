@@ -1,0 +1,66 @@
+{
+  "contacts": [
+    {
+      "nom": "Yanis",
+      "adresse": {
+        "ligne": "Résidence Léon Blum",
+        "rue": "181 avenue Léon Blum",
+        "code_postal": "33200",
+        "ville": "Bordeaux"
+      },
+      "telephone_parents": "06 33 72 20 31"
+    },
+    {
+      "nom": "Emile",
+      "adresse": {
+        "rue": "17 rue du Maréchal Galiéni",
+        "code_postal": "33110",
+        "ville": "Le Bouscat"
+      },
+      "telephone_parents": "06 87 39 72 05"
+    },
+    {
+      "nom": "Luka",
+      "adresse": {
+        "rue": "16 rue Eugène Leroy",
+        "complement": "Résidence Clos Montfort, Bâtiment 1, Entrée 12",
+        "ville": "Saint-Médard-en-Jalles"
+      },
+      "telephone_parents": "09 80 97 67 37"
+    },
+    {
+      "nom": "Abdelhak",
+      "adresse": {
+        "ligne": "La Palmeraie",
+        "rue": "22 rue des Sables",
+        "code_postal": "33185",
+        "ville": "Le Haillan"
+      },
+      "telephone_parents": "06 46 81 36 07"
+    },
+    {
+      "nom": "Mathys",
+      "adresse": {
+        "rue": "39 avenue de l'Hippodrome",
+        "code_postal": "33320",
+        "ville": "Eysines"
+      }
+    },
+    {
+      "nom": "Cameron",
+      "adresse": {
+        "rue": "33 allée de Cotoyard",
+        "code_postal": "33320",
+        "ville": "Le Taillan-Médoc"
+      }
+    }
+  ],
+  "etablissement": {
+    "nom": "ITEP Château Breillan",
+    "adresse": {
+      "rue": "Avenue de la Salle de Breillan",
+      "code_postal": "33290",
+      "ville": "Blanquefort"
+    }
+  }
+}
