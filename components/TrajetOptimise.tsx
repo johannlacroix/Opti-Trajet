@@ -39,7 +39,7 @@ export default function TrajetOptimiseView({ trajet, routeGeometry }: TrajetOpti
             <div className="text-xl font-bold text-blue-600">{trajet.heureDepart}</div>
           </div>
           <div className="bg-orange-50 p-4 rounded-lg">
-            <div className="text-sm text-gray-600">Heure d'arrivée</div>
+            <div className="text-sm text-gray-600">Heure d&apos;arrivée</div>
             <div className="text-xl font-bold text-orange-600">{trajet.heureArrivee}</div>
           </div>
           <div className="bg-green-50 p-4 rounded-lg">
