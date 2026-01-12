@@ -1,6 +1,53 @@
 import { Coordinates } from './geocoding';
 
 /**
+ * Décode une chaîne polyline encodée en coordonnées
+ * Algorithme basé sur la spécification Google Polyline Encoding
+ */
+function decoderPolyline(encoded: string): Coordinates[] {
+  const coordinates: Coordinates[] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte: number;
+
+    // Décode latitude
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += deltaLat;
+
+    shift = 0;
+    result = 0;
+
+    // Décode longitude
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += deltaLng;
+
+    coordinates.push({
+      lat: lat * 1e-5,
+      lng: lng * 1e-5
+    });
+  }
+
+  return coordinates;
+}
+
+/**
  * Service de calcul d'itinéraire utilisant OpenRouteService (gratuit)
  * Documentation: https://openrouteservice.org/dev/#/api-docs
  */
@@ -69,17 +116,21 @@ export async function calculerItineraire(
       let geometry: Coordinates[] = [];
       
       if (route.geometry) {
-        if (Array.isArray(route.geometry.coordinates)) {
-          // Format tableau de coordonnées
+        // Vérifier d'abord si c'est une chaîne (polyline encodé)
+        if (typeof route.geometry === 'string') {
+          // Format encodé (polyline) - décoder la chaîne
+          try {
+            geometry = decoderPolyline(route.geometry);
+          } catch (error) {
+            console.warn('Erreur lors du décodage de la géométrie encodée:', error);
+            geometry = [];
+          }
+        } else if (route.geometry.coordinates && Array.isArray(route.geometry.coordinates)) {
+          // Format GeoJSON avec tableau de coordonnées
           geometry = route.geometry.coordinates.map((coord: number[]) => ({
             lng: coord[0],
             lat: coord[1]
           }));
-        } else if (typeof route.geometry === 'string') {
-          // Format encodé (polyline) - on retourne un tableau vide pour l'instant
-          // On pourrait décoder le polyline avec une bibliothèque, mais pour l'instant on continue sans géométrie
-          console.warn('Géométrie encodée détectée, non décodée');
-          geometry = [];
         }
       }
 
@@ -136,6 +187,8 @@ export async function calculerMatriceDistances(
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Erreur API matrice de distances (${response.status}):`, errorText);
       console.warn('Impossible de calculer la matrice de distances');
       return null;
     }
@@ -146,6 +199,7 @@ export async function calculerMatriceDistances(
       return data.distances;
     }
 
+    console.warn('Réponse API matrice de distances sans champ distances:', data);
     return null;
   } catch (error) {
     console.error('Erreur calcul matrice:', error);
@@ -181,6 +235,8 @@ export async function calculerMatriceDurees(
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Erreur API matrice de durées (${response.status}):`, errorText);
       console.warn('Impossible de calculer la matrice de durées');
       return null;
     }
@@ -191,6 +247,7 @@ export async function calculerMatriceDurees(
       return data.durations;
     }
 
+    console.warn('Réponse API matrice de durées sans champ durations:', data);
     return null;
   } catch (error) {
     console.error('Erreur calcul matrice durées:', error);

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Contact, Etablissement, AdresseAutocomplete } from '@/types';
 import { rechercherAdresses } from '@/lib/api-adresse';
 import { formaterAdresse } from '@/lib/utils';
+import { ADRESSE_PERSONNELLE } from '@/data/initial-data';
 
 interface TrajetFormProps {
   contacts: Contact[];
@@ -24,7 +25,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
   
   const [departSuggestions, setDepartSuggestions] = useState<AdresseAutocomplete[]>([]);
   const [arriveeSuggestions, setArriveeSuggestions] = useState<AdresseAutocomplete[]>([]);
-  const [modePointDepart, setModePointDepart] = useState<'contact' | 'nouvelle'>('contact');
+  const [modePointDepart, setModePointDepart] = useState<'contact' | 'nouvelle'>('nouvelle');
   const [contactDepartSelectionne, setContactDepartSelectionne] = useState<string>('');
   const [optimiserPourEnfants, setOptimiserPourEnfants] = useState<boolean>(false);
 
@@ -38,11 +39,14 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
       setPointArrivee('');
       // Heure de départ par défaut : 16h00
       setHeureDepart('16:00');
+      setModePointDepart('nouvelle');
     } else {
-      setPointDepart('');
+      // Pour "Domiciles → Institut", utiliser l'adresse personnelle par défaut
+      setPointDepart(ADRESSE_PERSONNELLE);
       setPointArrivee(adresseEtablissement);
       // Heure d'arrivée par défaut : 8h45
       setHeureArrivee('08:45');
+      setModePointDepart('nouvelle');
     }
   }, [etablissement, sensTrajet]);
 
@@ -205,7 +209,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
       {sensTrajet === 'domiciles-institut' ? (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Point de départ (domicile du premier enfant) *
+            Point de départ *
           </label>
           <div className="mb-2">
             <div className="flex gap-4">

@@ -52,7 +52,7 @@ async function calculerDistanceDepuisPoint(
  */
 async function optimiserPourEnfants(
   coords: Coordinates[],
-  contactsAvecCoords: Array<{ contact: Contact; coordinates: Coordinates }>,
+  contactsAvecCoords: Array<{ contact: Contact; coordinates: Coordinates; indexDansCoords?: number }>,
   sensTrajet: 'institut-domiciles' | 'domiciles-institut',
   pointDepartIndex: number
 ): Promise<number[]> {
@@ -71,14 +71,32 @@ async function optimiserPourEnfants(
   // Pour "institut-domiciles": coords = [institut(0), domicile1(1), domicile2(2), ...]
   // Pour "domiciles-institut": coords = [domicile_depart(0), domicile1(1), ..., institut(n)]
   const enfantsAvecDistance = contactsAvecCoords.map((data, contactIndex) => {
-    // L'index dans coords dépend du sens du trajet
+    // Utiliser l'index stocké si disponible, sinon chercher par comparaison de coordonnées
     let indexDansCoords: number;
-    if (sensTrajet === 'institut-domiciles') {
-      // coords[0] = institut, coords[1..n] = domiciles
-      indexDansCoords = contactIndex + 1; // +1 car index 0 est l'institut
+    if (data.indexDansCoords !== undefined) {
+      indexDansCoords = data.indexDansCoords;
     } else {
-      // coords[0] = domicile départ, coords[1..n-1] = autres domiciles, coords[n] = institut
-      indexDansCoords = contactIndex + 1; // +1 car index 0 est le domicile départ
+      // Fallback : chercher par comparaison de coordonnées
+      if (sensTrajet === 'institut-domiciles') {
+        // coords[0] = institut, coords[1..n] = domiciles
+        indexDansCoords = coords.findIndex((coord, idx) => 
+          idx > 0 &&
+          Math.abs(coord.lat - data.coordinates.lat) < 0.0001 &&
+          Math.abs(coord.lng - data.coordinates.lng) < 0.0001
+        );
+      } else {
+        // coords[0] = domicile départ, coords[1..n-1] = autres domiciles, coords[n] = institut
+        indexDansCoords = coords.findIndex((coord, idx) => 
+          idx > 0 && idx < coords.length - 1 &&
+          Math.abs(coord.lat - data.coordinates.lat) < 0.0001 &&
+          Math.abs(coord.lng - data.coordinates.lng) < 0.0001
+        );
+      }
+      
+      if (indexDansCoords === -1) {
+        // Fallback : utiliser contactIndex + 1 si la recherche échoue
+        indexDansCoords = contactIndex + 1;
+      }
     }
     
     const distanceDepuisDepart = matriceDurees[0][contactIndex + 1]; // index 0 = départ dans matrice, contactIndex+1 = enfant
@@ -108,7 +126,7 @@ async function optimiserPourEnfants(
 export async function optimiserTrajet(
   trajetData: TrajetData,
   etablissement: Etablissement
-): Promise<{ trajet: TrajetOptimise; routeGeometry?: Coordinates[] } | null> {
+): Promise<{ trajet: TrajetOptimise; routeGeometry?: Coordinates[]; nombreSegments?: number } | null> {
   try {
     // 1. Construire la liste des adresses à visiter
     // Pour "Domiciles → Institut" : départ = premier domicile, intermédiaires = autres domiciles, arrivée = Institut
@@ -167,29 +185,66 @@ export async function optimiserTrajet(
     const coords = coordinates as Coordinates[];
 
     // 3. Construire les points de trajet
-    let contactsAvecCoords: Array<{ contact: Contact; coordinates: Coordinates }>;
+    let contactsAvecCoords: Array<{ contact: Contact; coordinates: Coordinates; indexDansCoords?: number }>;
     
     if (trajetData.sensTrajet === 'institut-domiciles') {
       // Pour "Institut → Domiciles", tous les contacts sont des destinations
       contactsAvecCoords = trajetData.contactsSelectionnes.map((contact, index) => ({
         contact,
         coordinates: coords[index + 1], // +1 car le premier est l'Institut
+        indexDansCoords: index + 1,
       }));
     } else {
       // Pour "Domiciles → Institut", exclure le contact du point de départ
-      contactsAvecCoords = trajetData.contactsSelectionnes
-        .filter(contact => {
-          const adresseContact = formaterAdresse(contact.adresse);
-          return adresseContact !== trajetData.pointDepart;
-        })
-        .map((contact, index) => {
-          const adresseContact = formaterAdresse(contact.adresse);
-          const adresseIndex = adresses.findIndex((addr, idx) => idx > 0 && addr === adresseContact && idx < adresses.length - 1);
+      const contactsFiltres = trajetData.contactsSelectionnes.filter(contact => {
+        const adresseContact = formaterAdresse(contact.adresse);
+        return adresseContact !== trajetData.pointDepart;
+      });
+      
+      console.log('DEBUG: contactsSelectionnes.length =', trajetData.contactsSelectionnes.length);
+      console.log('DEBUG: contactsFiltres.length =', contactsFiltres.length);
+      console.log('DEBUG: adresses.length =', adresses.length);
+      console.log('DEBUG: adresses =', adresses);
+      
+      // Mapper chaque contact filtré avec ses coordonnées en trouvant l'index dans adresses
+      contactsAvecCoords = contactsFiltres.map((contact, indexFiltre) => {
+        const adresseContact = formaterAdresse(contact.adresse);
+        // Pour domiciles-institut: adresses[0] = point de départ, adresses[1..n-1] = contacts, adresses[n] = institut
+        // Les contacts sont ajoutés dans le même ordre que contactsFiltres
+        // Donc l'index devrait être indexFiltre + 1
+        const adresseIndexAttendu = indexFiltre + 1;
+        
+        console.log(`DEBUG: contact ${contact.nom}, adresseContact=${adresseContact}, adresseIndexAttendu=${adresseIndexAttendu}, adresses[${adresseIndexAttendu}]=${adresses[adresseIndexAttendu]}`);
+        
+        // Vérifier que l'adresse à cet index correspond bien
+        if (adresses[adresseIndexAttendu] === adresseContact) {
           return {
             contact,
-            coordinates: adresseIndex !== -1 ? coords[adresseIndex] : coords[index + 1],
+            coordinates: coords[adresseIndexAttendu],
+            indexDansCoords: adresseIndexAttendu,
           };
-        });
+        }
+        
+        // Fallback : chercher dans adresses si l'ordre ne correspond pas
+        const adresseIndex = adresses.findIndex((addr, idx) => 
+          idx > 0 && idx < adresses.length - 1 && addr === adresseContact
+        );
+        
+        if (adresseIndex === -1) {
+          throw new Error(`Impossible de trouver l'adresse ${adresseContact} dans la liste des adresses`);
+        }
+        
+        console.log(`DEBUG: Fallback - contact ${contact.nom}, adresseIndex trouvé=${adresseIndex}`);
+        
+        return {
+          contact,
+          coordinates: coords[adresseIndex],
+          indexDansCoords: adresseIndex,
+        };
+      });
+      
+      console.log('DEBUG: contactsAvecCoords.length =', contactsAvecCoords.length);
+      console.log('DEBUG: contactsAvecCoords =', contactsAvecCoords.map(c => ({ nom: c.contact.nom, indexDansCoords: c.indexDansCoords })));
     }
 
     // Déterminer les labels pour le départ et l'arrivée
@@ -274,6 +329,7 @@ export async function optimiserTrajet(
         // Mode TSP classique : minimiser la durée totale
         // Pour le TSP, on inclut le départ et l'arrivée dans le calcul
         let tousPointsPourTSP: Coordinates[];
+        let dernierIndexTSP: number | null = null;
         
         if (trajetData.sensTrajet === 'institut-domiciles') {
           // Pour "Institut → Domiciles", on optimise tous les domiciles, le dernier sera l'arrivée
@@ -289,6 +345,7 @@ export async function optimiserTrajet(
             ...pointsIntermediaires,
             coords[coords.length - 1], // arrivée (Institut)
           ];
+          dernierIndexTSP = tousPointsPourTSP.length - 1;
         }
 
         const resultTSP = await resoudreTSP(tousPointsPourTSP, 0, true); // Toujours optimiser sur les durées (trafic)
@@ -298,6 +355,16 @@ export async function optimiserTrajet(
         }
         
         ordreOptimise = resultTSP.ordre;
+        
+        // Pour "domiciles-institut", les indices retournés par le TSP sont relatifs à tousPointsPourTSP
+        // Il faut les convertir en indices dans coords pour le mapping
+        if (trajetData.sensTrajet === 'domiciles-institut' && dernierIndexTSP !== null) {
+          // Les indices 1 à dernierIndexTSP-1 dans tousPointsPourTSP correspondent aux contacts
+          // et sont dans le même ordre que dans coords (coords[1] à coords[coords.length-2])
+          // Donc l'index dans tousPointsPourTSP = index dans coords pour les contacts
+          // On filtre juste pour exclure le départ (0) et l'arrivée (dernierIndexTSP)
+          ordreOptimise = ordreOptimise.filter(idx => idx !== 0 && idx !== dernierIndexTSP);
+        }
       }
       
       // Reconstruire l'ordre optimisé
@@ -314,20 +381,18 @@ export async function optimiserTrajet(
       // Les points intermédiaires
       let indicesIntermediaires: number[];
       if (trajetData.optimiserPourEnfants) {
-        // Dans ce mode, l'ordre est déjà [0, index1, index2, ...] où les index sont relatifs aux contacts
-        // On exclut le premier (départ) et le dernier si c'est un point fixe
-        if (trajetData.sensTrajet === 'institut-domiciles') {
-          indicesIntermediaires = ordreOptimise.slice(1); // Tous sauf le départ
-        } else {
-          indicesIntermediaires = ordreOptimise.slice(1, -1); // Exclure départ et arrivée
-        }
+        // Dans ce mode, optimiserPourEnfants retourne [0, index1, index2, ...] 
+        // où les index sont les indices dans coords des enfants seulement (pas l'institut)
+        // On exclut seulement le premier (départ), pas le dernier car l'institut n'est pas inclus
+        indicesIntermediaires = ordreOptimise.slice(1); // Tous sauf le départ
       } else {
         if (trajetData.sensTrajet === 'institut-domiciles') {
           // Pour "Institut → Domiciles", tous les indices sauf le premier (départ) sont des domiciles
           indicesIntermediaires = ordreOptimise.slice(1);
         } else {
-          // Pour "Domiciles → Institut", on exclut le premier (départ) et le dernier (arrivée)
-          indicesIntermediaires = ordreOptimise.slice(1, -1);
+          // Pour "Domiciles → Institut", ordreOptimise contient déjà uniquement les indices des contacts
+          // (le départ et l'arrivée ont déjà été filtrés)
+          indicesIntermediaires = ordreOptimise;
         }
       }
       
@@ -339,18 +404,38 @@ export async function optimiserTrajet(
           mappingIndices.set(i + 1, i); // index dans coords -> index dans contactsAvecCoords
         });
       } else {
-        // Pour domiciles-institut, c'est plus complexe car le départ peut être un domicile
-        // On va mapper en fonction de l'ordre dans contactsAvecCoords
-        let contactIndex = 0;
-        for (let i = 1; i < coords.length - 1; i++) {
-          mappingIndices.set(i, contactIndex++);
-        }
+        // Pour domiciles-institut, mapper les indices des coords vers les contacts
+        // coords[0] = point de départ, coords[1..n-1] = contacts intermédiaires, coords[n] = institut
+        console.log('DEBUG mapping: contactsAvecCoords.length =', contactsAvecCoords.length);
+        contactsAvecCoords.forEach((contactData, contactIndex) => {
+          // Utiliser l'index stocké (qui devrait toujours être défini maintenant)
+          if (contactData.indexDansCoords !== undefined) {
+            console.log(`DEBUG mapping: ${contactData.contact.nom}, indexDansCoords=${contactData.indexDansCoords}, contactIndex=${contactIndex}`);
+            mappingIndices.set(contactData.indexDansCoords, contactIndex);
+          } else {
+            // Fallback : chercher par comparaison de coordonnées (ne devrait pas arriver)
+            console.warn('indexDansCoords non défini pour un contact, utilisation du fallback');
+            const coordIndex = coords.findIndex((coord, idx) => 
+              idx > 0 && idx < coords.length - 1 &&
+              Math.abs(coord.lat - contactData.coordinates.lat) < 0.0001 &&
+              Math.abs(coord.lng - contactData.coordinates.lng) < 0.0001
+            );
+            if (coordIndex !== -1) {
+              mappingIndices.set(coordIndex, contactIndex);
+            }
+          }
+        });
+        console.log('DEBUG mapping: mappingIndices.size =', mappingIndices.size);
+        console.log('DEBUG mapping: mappingIndices =', Array.from(mappingIndices.entries()));
       }
       
+      console.log('DEBUG mapping: indicesIntermediaires =', indicesIntermediaires);
       indicesIntermediaires.forEach((idxCoord, i) => {
         const contactIndex = mappingIndices.get(idxCoord);
+        console.log(`DEBUG mapping: idxCoord=${idxCoord}, contactIndex=${contactIndex}, contactsAvecCoords.length=${contactsAvecCoords.length}`);
         if (contactIndex !== undefined && contactIndex < contactsAvecCoords.length) {
           const contactData = contactsAvecCoords[contactIndex];
+          console.log(`DEBUG mapping: Ajout ${contactData.contact.nom} à l'index ${i + 1}`);
           pointsOptimises.push({
             label: contactData.contact.prenom 
               ? `${contactData.contact.prenom} ${contactData.contact.nom}` 
@@ -360,6 +445,8 @@ export async function optimiserTrajet(
             contact: contactData.contact,
             index: i + 1,
           });
+        } else {
+          console.warn(`DEBUG mapping: Contact non mappé! idxCoord=${idxCoord}, contactIndex=${contactIndex}`);
         }
       });
 
@@ -382,6 +469,7 @@ export async function optimiserTrajet(
     // 5. Calculer la distance et durée totales en calculant chaque segment
     let distanceTotale = 0;
     let dureeTotale = 0; // Durée de conduite pure (sans arrêts)
+    let nombreSegmentsTotal = 0; // Nombre total de segments (pour tri par facilité)
     const routeSegments: Coordinates[][] = [];
 
     for (let i = 0; i < pointsOptimises.length - 1; i++) {
@@ -393,6 +481,7 @@ export async function optimiserTrajet(
       if (route) {
         distanceTotale += route.distance;
         dureeTotale += route.duration;
+        nombreSegmentsTotal += route.segments?.length || 0;
         if (route.geometry && route.geometry.length > 0) {
           routeSegments.push(route.geometry);
         }
@@ -448,6 +537,7 @@ export async function optimiserTrajet(
     return {
       trajet,
       routeGeometry,
+      nombreSegments: nombreSegmentsTotal,
     };
   } catch (error) {
     console.error('Erreur optimisation trajet:', error);
