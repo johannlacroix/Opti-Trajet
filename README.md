@@ -138,6 +138,29 @@ L'application utilise plusieurs algorithmes pour optimiser les trajets :
 - 📊 Statistiques sur les trajets
 - 🗺️ Options de visualisation avancées (couleurs par variante, etc.)
 
+## Déploiement
+
+### Vercel (recommandé)
+
+Ce projet est configuré pour être déployé automatiquement sur [Vercel](https://vercel.com) :
+
+1. **Connecter le repository GitHub** :
+   - Allez sur [vercel.com](https://vercel.com)
+   - Connectez-vous avec votre compte GitHub
+   - Cliquez sur "Add New Project"
+   - Sélectionnez le repository `Opti-Trajet`
+
+2. **Configuration** :
+   - Vercel détectera automatiquement Next.js
+   - Ajoutez la variable d'environnement `NEXT_PUBLIC_ORS_API_KEY` dans les paramètres du projet
+   - Vercel déploiera automatiquement à chaque push sur `main`
+
+3. **Déploiement automatique** :
+   - Chaque push sur la branche `main` déclenche un nouveau déploiement
+   - Les branches `dev` et `staging` peuvent également être déployées comme preview deployments
+
+**Note** : N'oubliez pas de configurer la variable d'environnement `NEXT_PUBLIC_ORS_API_KEY` dans les paramètres Vercel pour que l'API OpenRouteService fonctionne en production.
+
 ## Licence
 
 Ce projet est un outil personnel pour l'optimisation de trajets.
