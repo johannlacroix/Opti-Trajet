@@ -1,5 +1,8 @@
 import { DonneesInitiales } from '@/types';
 
+// Adresse personnelle du chauffeur (point de départ par défaut)
+export const ADRESSE_PERSONNELLE = '71a rue de macau, Parempuyre';
+
 export const initialData: DonneesInitiales = {
   contacts: [
     {

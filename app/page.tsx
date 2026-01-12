@@ -17,8 +17,10 @@ export default function Home() {
   const [showContactForm, setShowContactForm] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | undefined>();
   const [activeTab, setActiveTab] = useState<'contacts' | 'trajet'>('contacts');
-  const [trajetOptimise, setTrajetOptimise] = useState<{ trajet: TrajetOptimise; routeGeometry?: Coordinates[] } | null>(null);
+  const [trajetsOptimises, setTrajetsOptimises] = useState<Array<{ id: number; trajet: TrajetOptimise; routeGeometry?: Coordinates[]; parametres: any; nombreSegments?: number }>>([]);
+  const [activeTrajetIndex, setActiveTrajetIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [derniersParametres, setDerniersParametres] = useState<any>(null);
 
   // Charger les contacts au démarrage
   useEffect(() => {
@@ -66,17 +68,64 @@ export default function Home() {
 
   const handleTrajetSubmit = async (trajetData: any) => {
     setIsLoading(true);
-    setTrajetOptimise(null);
 
     try {
-      const result = await optimiserTrajet(trajetData, etablissement);
-      
-      if (result) {
-        setTrajetOptimise(result);
-        setActiveTab('trajet'); // Rester sur l'onglet trajet pour voir le résultat
-      } else {
-        alert('Erreur lors de l\'optimisation du trajet. Veuillez vérifier les adresses.');
+      // Générer toutes les variantes possibles automatiquement
+      const variantes = [
+        { ...trajetData, optimiserPourEnfants: false }, // Durée totale minimisée
+        { ...trajetData, optimiserPourEnfants: true },  // Temps de chaque enfant minimisé
+      ];
+
+      const trajetsGeneres: Array<{ id: number; trajet: TrajetOptimise; routeGeometry?: Coordinates[]; parametres: any; nombreSegments?: number }> = [];
+
+      // Générer chaque variante
+      for (const parametresVariante of variantes) {
+        try {
+          const result = await optimiserTrajet(parametresVariante, etablissement);
+          if (result) {
+            trajetsGeneres.push({
+              id: Date.now() + Math.random(), // ID unique
+              trajet: result.trajet,
+              routeGeometry: result.routeGeometry,
+              parametres: parametresVariante,
+              nombreSegments: result.nombreSegments || 0,
+            });
+          }
+        } catch (error) {
+          console.error('Erreur lors de la génération d\'une variante:', error);
+          // Continuer avec les autres variantes même si une échoue
+        }
       }
+
+      if (trajetsGeneres.length === 0) {
+        alert('Erreur lors de l\'optimisation des trajets. Veuillez vérifier les adresses.');
+        return;
+      }
+
+      // Trier par durée (du plus rapide au plus lent), puis par distance (du plus court au plus long), 
+      // puis par nombre de segments (du plus simple au plus complexe) en cas d'égalité
+      trajetsGeneres.sort((a, b) => {
+        // D'abord par durée
+        const diffDuree = a.trajet.duree - b.trajet.duree;
+        if (diffDuree !== 0) {
+          return diffDuree;
+        }
+        // En cas d'égalité de durée, trier par distance (du plus court au plus long)
+        const diffDistance = a.trajet.distance - b.trajet.distance;
+        if (diffDistance !== 0) {
+          return diffDistance;
+        }
+        // En cas d'égalité de durée et distance, trier par nombre de segments (du plus simple au plus complexe)
+        // Moins de segments = moins de changements de direction = plus "facile"
+        const nbSegmentsA = a.nombreSegments || 0;
+        const nbSegmentsB = b.nombreSegments || 0;
+        return nbSegmentsA - nbSegmentsB;
+      });
+
+      setDerniersParametres(trajetData);
+      setTrajetsOptimises(trajetsGeneres);
+      setActiveTrajetIndex(0); // Afficher le plus rapide par défaut
+      setActiveTab('trajet');
     } catch (error) {
       console.error('Erreur:', error);
       const messageErreur = error instanceof Error ? error.message : 'Une erreur est survenue lors du calcul du trajet.';
@@ -84,6 +133,23 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+
+  const handleSupprimerTrajet = (index: number) => {
+    setTrajetsOptimises(prev => {
+      if (prev.length <= 1) {
+        setDerniersParametres(null);
+        setActiveTrajetIndex(0);
+        return [];
+      } else {
+        const nouveauxTrajets = prev.filter((_, i) => i !== index);
+        if (activeTrajetIndex >= nouveauxTrajets.length) {
+          setActiveTrajetIndex(nouveauxTrajets.length - 1);
+        }
+        return nouveauxTrajets;
+      }
+    });
   };
 
   return (
@@ -101,7 +167,6 @@ export default function Home() {
             <button
               onClick={() => {
                 setActiveTab('contacts');
-                setTrajetOptimise(null);
               }}
               className={`py-4 px-6 font-medium border-b-2 transition-colors ${
                 activeTab === 'contacts'
@@ -164,21 +229,68 @@ export default function Home() {
 
         {activeTab === 'trajet' && (
           <div className="space-y-6">
-            {trajetOptimise ? (
+            {trajetsOptimises.length > 0 ? (
               <>
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-gray-800">Trajet optimisé</h2>
-                  <button
-                    onClick={() => setTrajetOptimise(null)}
-                    className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
-                  >
-                    Nouveau trajet
-                  </button>
+                {/* Onglets des trajets */}
+                <div className="bg-white rounded-lg shadow-md">
+                  <div className="border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-2 overflow-x-auto">
+                        {trajetsOptimises.map((trajet, index) => {
+                          const nomsVariantes = ['Premier', 'Bis', 'Ter', 'Quater', 'Quinquies', 'Sexies'];
+                          const nomVariante = nomsVariantes[index] || `${index + 1}`;
+                          
+                          return (
+                            <div key={trajet.id} className="flex items-center">
+                              <button
+                                onClick={() => setActiveTrajetIndex(index)}
+                                className={`py-3 px-6 font-medium border-b-2 transition-colors whitespace-nowrap ${
+                                  activeTrajetIndex === index
+                                    ? 'border-blue-600 text-blue-600'
+                                    : 'border-transparent text-gray-600 hover:text-gray-800'
+                                }`}
+                              >
+                                Trajet {nomVariante}
+                              </button>
+                              {trajetsOptimises.length > 1 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSupprimerTrajet(index);
+                                  }}
+                                  className="ml-2 text-red-500 hover:text-red-700 px-2 py-1"
+                                  title="Supprimer ce trajet"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2 px-4">
+                        <button
+                          onClick={() => {
+                            setTrajetsOptimises([]);
+                            setActiveTrajetIndex(0);
+                            setDerniersParametres(null);
+                          }}
+                          className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                        >
+                          Nouveau trajet
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <TrajetOptimiseView 
-                  trajet={trajetOptimise.trajet}
-                  routeGeometry={trajetOptimise.routeGeometry}
-                />
+
+                {/* Affichage du trajet actif */}
+                {trajetsOptimises[activeTrajetIndex] && (
+                  <TrajetOptimiseView 
+                    trajet={trajetsOptimises[activeTrajetIndex].trajet}
+                    routeGeometry={trajetsOptimises[activeTrajetIndex].routeGeometry}
+                  />
+                )}
               </>
             ) : (
               <>
