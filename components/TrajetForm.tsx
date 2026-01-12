@@ -174,7 +174,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
       {sensTrajet === 'domiciles-institut' ? (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Heure d'arrivée à l'institut *
+            Heure d&apos;arrivée à l&apos;institut *
           </label>
           <input
             type="time"
@@ -184,13 +184,13 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
             required
           />
           <p className="text-xs text-gray-500 mt-1">
-            L'heure de départ sera calculée en fonction de la durée du trajet
+            L&apos;heure de départ sera calculée en fonction de la durée du trajet
           </p>
         </div>
       ) : (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Heure de départ de l'institut *
+            Heure de départ de l&apos;institut *
           </label>
           <input
             type="time"
@@ -200,7 +200,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
             required
           />
           <p className="text-xs text-gray-500 mt-1">
-            L'heure d'arrivée au dernier domicile sera calculée en fonction de la durée du trajet
+            L&apos;heure d&apos;arrivée au dernier domicile sera calculée en fonction de la durée du trajet
           </p>
         </div>
       )}
@@ -318,7 +318,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
       {sensTrajet === 'domiciles-institut' ? (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Point d'arrivée (Institut) *
+            Point d&apos;arrivée (Institut) *
           </label>
           <input
             type="text"
@@ -334,7 +334,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
       ) : (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Point d'arrivée (dernier domicile après optimisation)
+            Point d&apos;arrivée (dernier domicile après optimisation)
           </label>
           <input
             type="text"
@@ -343,7 +343,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
             className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
           />
           <p className="text-xs text-gray-500 mt-1">
-            L'ordre des domiciles sera optimisé automatiquement
+            L&apos;ordre des domiciles sera optimisé automatiquement
           </p>
         </div>
       )}
@@ -386,7 +386,7 @@ export default function TrajetForm({ contacts, etablissement, onSubmit, onAddCon
                   onClick={onAddContact}
                   className="text-blue-600 hover:text-blue-800 underline"
                 >
-                  Ajoutez-en d'abord dans le répertoire
+                  Ajoutez-en d&apos;abord dans le répertoire
                 </button>
               )}
             </p>
