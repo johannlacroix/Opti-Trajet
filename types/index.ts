@@ -49,6 +49,7 @@ export interface PointTrajet {
   };
   contact?: Contact;
   index: number;
+  heurePassage?: string; // Heure estimée de passage (pour le ramassage en mode domiciles-institut)
 }
 
 export interface TrajetOptimise {
@@ -57,4 +58,5 @@ export interface TrajetOptimise {
   duree: number; // en secondes
   heureDepart: string;
   heureArrivee: string;
+  sensTrajet?: 'institut-domiciles' | 'domiciles-institut'; // Sens du trajet pour savoir si afficher les heures de passage
 }

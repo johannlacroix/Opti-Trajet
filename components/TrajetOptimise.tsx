@@ -88,6 +88,12 @@ export default function TrajetOptimiseView({ trajet, routeGeometry }: TrajetOpti
                       <span>{point.contact.telephone_parents}</span>
                     </div>
                   )}
+                  {trajet.sensTrajet === 'domiciles-institut' && point.heurePassage && point.contact && (
+                    <div className="text-orange-600 mt-2 flex items-center gap-2 font-semibold">
+                      <span>🕐</span>
+                      <span>Heure de passage estimée : {point.heurePassage}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
