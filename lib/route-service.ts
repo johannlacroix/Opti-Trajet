@@ -62,7 +62,7 @@ export interface RouteSegment {
 }
 
 export interface RouteResult {
-  geometry: Coordinates[];
+  geometry?: Coordinates[];
   distance: number; // en mètres
   duration: number; // en secondes
   segments: RouteSegment[];
