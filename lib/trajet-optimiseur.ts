@@ -471,6 +471,7 @@ export async function optimiserTrajet(
     let dureeTotale = 0; // Durée de conduite pure (sans arrêts)
     let nombreSegmentsTotal = 0; // Nombre total de segments (pour tri par facilité)
     const routeSegments: Coordinates[][] = [];
+    const dureesSegments: number[] = []; // Stocker les durées de chaque segment pour calculer les heures de passage
 
     for (let i = 0; i < pointsOptimises.length - 1; i++) {
       const route = await calculerItineraire(
@@ -481,10 +482,13 @@ export async function optimiserTrajet(
       if (route) {
         distanceTotale += route.distance;
         dureeTotale += route.duration;
+        dureesSegments.push(route.duration); // Stocker la durée de ce segment
         nombreSegmentsTotal += route.segments?.length || 0;
         if (route.geometry && route.geometry.length > 0) {
           routeSegments.push(route.geometry);
         }
+      } else {
+        dureesSegments.push(0); // Si pas de route, durée 0
       }
     }
 
@@ -526,12 +530,46 @@ export async function optimiserTrajet(
       heureArriveeFinal = `${String(heuresArr).padStart(2, '0')}:${String(minutesArr).padStart(2, '0')}`;
     }
 
+    // Calculer les heures de passage pour chaque point en mode "domiciles-institut"
+    if (trajetData.sensTrajet === 'domiciles-institut') {
+      // Fonction pour ajouter des minutes à une heure
+      const ajouterMinutes = (heure: string, minutesAAjouter: number): string => {
+        const [heures, minutes] = heure.split(':').map(Number);
+        const totalMinutes = heures * 60 + minutes + minutesAAjouter;
+        const nouvellesHeures = Math.floor(totalMinutes / 60) % 24;
+        const nouvellesMinutes = totalMinutes % 60;
+        return `${String(nouvellesHeures).padStart(2, '0')}:${String(nouvellesMinutes).padStart(2, '0')}`;
+      };
+
+      // Partir de l'heure de départ
+      let heureActuelle = heureDepartFinal;
+      
+      // Pour chaque segment, calculer l'heure d'arrivée au point suivant
+      for (let i = 0; i < pointsOptimises.length - 1; i++) {
+        // Ajouter la durée du segment (en minutes)
+        const dureeSegmentMinutes = Math.floor(dureesSegments[i] / 60);
+        heureActuelle = ajouterMinutes(heureActuelle, dureeSegmentMinutes);
+        
+        // Le point suivant (index i+1) est atteint à cette heure
+        const pointSuivant = pointsOptimises[i + 1];
+        
+        // Si c'est un point de ramassage (a un contact), c'est l'heure de passage
+        if (pointSuivant.contact) {
+          pointSuivant.heurePassage = heureActuelle;
+          // Ajouter le temps d'arrêt pour le ramassage (5 minutes) avant de continuer
+          heureActuelle = ajouterMinutes(heureActuelle, TEMPS_PAR_ARRET_SECONDES / 60);
+        }
+        // Si ce n'est pas un contact (c'est l'institut), pas besoin d'heure de passage
+      }
+    }
+
     const trajet: TrajetOptimise = {
       points: pointsOptimises,
       distance: distanceTotale,
       duree: dureeTotaleAvecMarge, // Utiliser la durée avec marge
       heureDepart: heureDepartFinal,
       heureArrivee: heureArriveeFinal,
+      sensTrajet: trajetData.sensTrajet,
     };
 
     return {
